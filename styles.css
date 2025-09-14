@@ -1,0 +1,73 @@
+* {
+  font-family: monospace;
+
+}
+input[type=radio] {
+  position: absolute;
+  visibility: hidden;
+  display: none;
+}
+
+label {
+  display: inline-block;
+  cursor: pointer;
+  padding: 5px 20px;
+  border-radius: 10px;
+  border-style: solid;
+  border-color: #000000;
+}
+
+input[type=radio]:checked + label {
+  background-color: #999;
+}
+
+input[type=submit] {
+  cursor: pointer;
+  border: 0px;
+  background-color: #ffddff;
+  padding: 5px 20px;
+  border-radius: 10px;
+  border-color: #000000;
+}
+
+.dt {
+	display: table;
+}
+.dr {
+	display: table-row;
+}
+.dr2 {
+	display: table-row;
+}
+.dc, .divTableHead {
+  border: 1px solid #999999;
+	display: table-cell;
+	padding: 1px 1px;
+}
+.dc1 {
+	background-color: #CCC;
+	border: 1px solid #999999;
+	display: table-cell;
+	padding: 1px 1px;
+  width: 143px;
+}
+.dc2 {
+	border: 1px solid #999999;
+	display: table-cell;
+	padding: 1px 1px;
+}
+.dc2:first-letter {
+	background-color: #CCC;  
+}
+.dc3 {
+  display: table-cell;
+}
+.dc4 {
+	background-color: #EEE;
+	border: 1px solid #999999;
+	display: table-cell;
+	padding: 1px 1px;  
+}
+.divTableBody {
+	display: table-row-group;
+}
