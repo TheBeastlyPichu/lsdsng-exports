@@ -1,3 +1,5 @@
+// conversion.js — browser-ready (window.*), expects Uint8Array input
+
 // lots of info on unpacking and sav structure taken from LSDJ wiki
 // https://littlesounddj.fandom.com/wiki/.sav_structure
 // https://littlesounddj.fandom.com/wiki/File_Management_Structure
@@ -256,15 +258,22 @@ const lsdsng = {
   bookmarks: [],
   grooves: []
 };
-exports.unpack = function(data) {
+
+// Browser-ready unpack: expects a Uint8Array
+window.unpack = function(data) {
+  // ensure we have a Uint8Array
+  if (!(data instanceof Uint8Array)) {
+    data = new Uint8Array(data);
+  }
+
   let lsdsngObj = JSON.parse(JSON.stringify(lsdsng));
   let decompressedData = [];
   let bank = 0;
   // set name (first 8 bytes)
   let name = data.slice(0, 8);
   lsdsngObj.name = [...name];
-  // set ver (9th byte)
-  lsdsngObj.ver = data.readUInt8(8);
+  // set ver (9th byte) — use direct indexing (browser)
+  lsdsngObj.ver = data[8];
   // slice the buffer for unpacking based on LSDSNG spec noted at the top
   data = data.slice(9);
   let i = 0;
@@ -326,12 +335,10 @@ exports.unpack = function(data) {
     else {
       decompressedData.push(data[i]);
       i++;
+      // if index exceeds data length, break to avoid infinite loop
+      if (i >= data.length) break;
     }
   }
-  // check file size, should be 32768
-  // if (decompressedData.length != 32768) {
-  //   throw "Error processing file.";
-  // }
 
   // start categorizing the data that was unpacked as per LSDSNG Spec
   i = 0;
@@ -503,7 +510,7 @@ exports.unpack = function(data) {
 };
 
 // creates the html
-exports.makeHTML = function(data) {
+window.makeHTML = function(data) {
   const EFFECTS = getVersionEffects(data);
   let outputHTML = "";
   let chain;
@@ -555,9 +562,7 @@ exports.makeHTML = function(data) {
             .slice(-2)}</div>\n`;
           outputHTML += `<div class="dc">\n`;
           for (let l = 0; l < 16; l++) {
-            // outputHTML += `<div class="dr">\n`;
             if (phrase != "--") {
-              // outputHTML += `<div class="dc">${String('0'+l.toString(16)).toUpperCase().slice(-2)}</div>`;
               outputHTML += `${l.toString(16).toUpperCase()}|`;
               let note = data.phrases.notes[phrase][l];
               if (note != 0) {
@@ -569,14 +574,11 @@ exports.makeHTML = function(data) {
               } else {
                 note = NOTES[0];
               }
-              // outputHTML += `<div class="dc">${note}</div>`;
               outputHTML += `${note}|`;
               let instrument = data.phrases.instruments[phrase][l];
               if (instrument == 255) {
                 instrument = "--";
               }
-              // outputHTML += `<div class="dc">${'I'+String('0'+instrument.toString(16)).toUpperCase().slice(-2)}</div>`;
-              // outputHTML += `<div class="dc2">${EFFECTS[data.phrases.fx[phrase][l]]+String('0'+data.phrases.fxval[phrase][l].toString(16)).toUpperCase().slice(-2)}</div>`;
               outputHTML += `${"I" +
                 String("0" + instrument.toString(16))
                   .toUpperCase()
@@ -586,9 +588,7 @@ exports.makeHTML = function(data) {
                 String("0" + data.phrases.fxval[phrase][l].toString(16))
                   .toUpperCase()
                   .slice(-2)}<br>`;
-              // outputHTML += `<div class="dc">${String('0'+data.phrases.fxval[phrase][l].toString(16)).toUpperCase().slice(-2)}</div>`;
             }
-            // outputHTML += `</div>`;
           }
           outputHTML += `</div></div>`;
         }
@@ -664,6 +664,7 @@ function processTempoMetaTrack(metaEventList, tempoAdjust) {
     }
   }
   sortedEvents = sortedEvents.sort(compare);
+  if (sortedEvents.length === 0) return [];
   let lastEvent = sortedEvents[0];
   trackOutput.push(
     ...deltaTime(lastEvent.time + 5),
@@ -687,7 +688,8 @@ function processTempoMetaTrack(metaEventList, tempoAdjust) {
   }
   return trackOutput;
 }
-exports.makeMIDI = function(data) {
+
+window.makeMIDI = function(data) {
   const EFFECTS = getVersionEffects(data);
   let grooveSum = 0;
   let grooveLength = 16;
@@ -698,6 +700,8 @@ exports.makeMIDI = function(data) {
       break;
     }
   }
+  // guard against divide by zero
+  if (grooveLength === 0) grooveLength = 1;
   let ticksPerQuarter = toBytes(((grooveSum * 1.0) / grooveLength) * 80, 2);
   let adjustedTempo = (data.tempo * grooveLength * 6.0) / grooveSum;
   let midiTempo = Math.round((1 / (adjustedTempo / 60.0)) * 1000000);
@@ -814,7 +818,7 @@ exports.makeMIDI = function(data) {
                   if (data.phrases.instruments[currPhrase][k] != 255) {
                     currInstrument = data.phrases.instruments[currPhrase][k];
                   }
-                  if (currInstrument == 0x40 || data.instruments.params[currInstrument][5] & 32) {
+                  if (currInstrument == 0x40 || (data.instruments.params[currInstrument][5] & 32)) {
                     currNote += MIDIOFFSET;
                   } else {
                     currNote += MIDIOFFSET + transpose;
@@ -858,6 +862,15 @@ exports.makeMIDI = function(data) {
       }
     }
     // process note off and write the track
+    // guard against empty eventList
+    if (!eventList[channel] || eventList[channel].length === 0) {
+      // push end-of-track
+      tracks[channel].push(...[0x00, 0xff, 0x2f, 0x00]);
+      tracks[channel].unshift(...toBytes(tracks[channel].length, 4));
+      tracks[channel].unshift(...mTrk);
+      continue;
+    }
+
     lastEvent = eventList[channel][0];
     tracks[channel].push(
       ...[...deltaTime(0x0), 0x90 + channel, lastEvent.note, 0x70]
@@ -941,3 +954,4 @@ function getVersionEffects(data) {
     "Z"
   ]);
 }
+
